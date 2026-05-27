@@ -1,6 +1,8 @@
 import { AcGePoint3dLike } from '@mlightcad/data-model'
 import * as THREE from 'three'
 
+import { shouldUseSplitTranslation } from './AcTrRelativeToEyeUtil'
+
 /**
  * Relative-to-eye flags stored on {@link THREE.Object3D.userData}.
  *
@@ -169,7 +171,11 @@ export function getBatchedContainerUserData(
  * Sets {@link AcTrRteObjectUserData.useSplitTranslation} when the object's world
  * origin is large enough to require the RTE shader path.
  */
-export function markSplitTranslationFlag(_object: THREE.Object3D): void {}
+export function markSplitTranslationFlag(object: THREE.Object3D): void {
+  if (shouldUseSplitTranslation(object)) {
+    getBatchedContainerUserData(object).useSplitTranslation = true
+  }
+}
 
 /**
  * Copies RTE / no-batch flags from a source drawable onto a highlight clone.
@@ -181,7 +187,7 @@ export function copyHighlightObjectFlags(
   const sourceData = getObjectUserData(source)
   const targetData = getSceneDrawableUserData(target)
 
-  if (sourceData.useSplitTranslation) {
+  if (sourceData.useSplitTranslation || shouldUseSplitTranslation(source)) {
     targetData.useSplitTranslation = true
   }
 

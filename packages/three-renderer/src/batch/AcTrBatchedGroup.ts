@@ -12,6 +12,7 @@ import {
   getHighlightUserData,
   getSceneDrawableUserData
 } from '../util/AcTrObjectUserData'
+import { AcTrRelativeToEyeUtil } from '../util/AcTrRelativeToEyeUtil'
 import { isObjectHierarchyVisible } from '../util/AcTrVisibility'
 import { AcTrBatchGeometryUserData } from './AcTrBatchedGeometryInfo'
 import { AcTrBatchedLine } from './AcTrBatchedLine'
@@ -605,7 +606,16 @@ export class AcTrBatchedGroup extends THREE.Group {
     if (unbatchedObjects) {
       for (let i = 0; i < unbatchedObjects.length; i++) {
         const object = unbatchedObjects[i]
+        const offset = AcTrRelativeToEyeUtil.getRayOriginOffset(raycaster)
+        if (offset) {
+          object.position.sub(offset)
+          object.updateMatrixWorld(true)
+        }
         const intersects = raycaster.intersectObject(object, true)
+        if (offset) {
+          object.position.add(offset)
+          object.updateMatrixWorld(true)
+        }
         if (intersects.length > 0) return true
       }
     }
@@ -669,9 +679,9 @@ export class AcTrBatchedGroup extends THREE.Group {
           item.batchedObjectId
         ) as AcTrBatchedObject
         const object = batchedObject.getObjectAt(item.batchId)
-
         this.copyHighlightMetadata(batchedObject, object)
         this.applyHighlightMaterial(object)
+        AcTrRelativeToEyeUtil.enableForObject(object)
         const highlightUserData = getHighlightUserData(object)
         highlightUserData.objectId = objectId
         highlightUserData.disposeGeometryOnRemove =
@@ -686,6 +696,7 @@ export class AcTrBatchedGroup extends THREE.Group {
         const highlightObj = obj.clone()
         this.copyHighlightMetadata(obj, highlightObj)
         this.applyHighlightMaterial(highlightObj)
+        AcTrRelativeToEyeUtil.enableForObject(highlightObj)
         getHighlightUserData(highlightObj).objectId = objectId
         containerGroup.add(highlightObj)
       })
@@ -1058,8 +1069,17 @@ export class AcTrBatchedGroup extends THREE.Group {
     if (this.hasGeometry(source) && this.hasGeometry(cloned)) {
       const geometry = source.geometry
       const clonedGeometry = geometry.clone()
-      clonedGeometry.applyMatrix4(source.matrixWorld)
+      const matrixNoTranslation = source.matrixWorld.clone()
+      const worldOffset = new THREE.Vector3().setFromMatrixPosition(
+        source.matrixWorld
+      )
+      matrixNoTranslation.setPosition(0, 0, 0)
+      clonedGeometry.applyMatrix4(matrixNoTranslation)
       cloned.geometry = clonedGeometry
+      cloned.position.copy(worldOffset)
+      getSceneDrawableUserData(cloned).useSplitTranslation = true
+    } else {
+      cloned.position.set(0, 0, 0)
     }
     if (this.hasMaterial(source) && this.hasMaterial(cloned)) {
       cloned.material = source.material
@@ -1069,7 +1089,6 @@ export class AcTrBatchedGroup extends THREE.Group {
         sourceDrawable.styleMaterialId ?? this.getMaterialId(source.material)
       clonedDrawable.bakedWorldMatrix = source.matrixWorld.toArray()
     }
-    cloned.position.set(0, 0, 0)
     cloned.rotation.set(0, 0, 0)
     cloned.scale.set(1, 1, 1)
     cloned.updateMatrix()
