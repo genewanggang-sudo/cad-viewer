@@ -1206,22 +1206,23 @@ export class AcApDocManager {
 
       const view = this.curView as AcTrView2d
       const progressiveRendering = options?.progressiveRendering ?? false
-      if (isPaperSpaceActive && layoutLimits && !layoutLimits.isEmpty()) {
-        view.zoomTo(layoutLimits)
+      if (isPaperSpaceActive) {
+        if (activeLayout) {
+          view.initializeStartupLayout(activeLayout)
+        } else if (layoutLimits && !layoutLimits.isEmpty()) {
+          view.zoomTo(layoutLimits)
+          view.markLayoutAsInitialized(db.currentSpaceId)
+        } else {
+          view.zoomToFitDrawing()
+          view.markLayoutAsInitialized(db.currentSpaceId)
+        }
       } else {
         if (progressiveRendering) {
           view.beginProgressiveOpenFit()
         }
         view.zoomToFitDrawing()
+        view.markLayoutAsInitialized(db.currentSpaceId)
       }
-
-      // Tell the view we've already framed the startup layout, so that
-      // when the user later switches to a different tab and back, the
-      // `layoutSwitched` handler doesn't re-zoom and trash their pan/zoom
-      // state on this layout. Cast is intentional: `setActiveLayout`
-      // above relies on `curView` being an `AcTrView2d`, and the
-      // markLayoutAsInitialized method is part of that contract.
-      ;(this.curView as AcTrView2d).markLayoutAsInitialized(db.currentSpaceId)
     }
   }
 

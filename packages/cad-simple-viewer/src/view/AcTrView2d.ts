@@ -1324,6 +1324,27 @@ export class AcTrView2d extends AcEdBaseView {
   }
 
   /**
+   * Initializes the layout that is active when a document finishes opening.
+   * This reuses the first-visit layout loading flow without dispatching a
+   * synthetic layout switch event.
+   */
+  initializeStartupLayout(layout: AcDbLayout) {
+    const btrId = layout.blockTableRecordId
+    const isFirstVisit = !this._initializedLayouts.has(btrId)
+    this._initializedLayouts.add(btrId)
+
+    this.activeLayoutBtrId = btrId
+    this.createLayoutViewIfNeeded(btrId)
+    this.loadLayoutEntitiesIfNeeded(btrId)
+    this.refreshCanvasBackgroundForActiveLayout()
+    this._isDirty = true
+
+    if (isFirstVisit) {
+      this.applyInitialZoom(btrId, layout)
+    }
+  }
+
+  /**
    * Marks a layout as already framed by an external caller (typically
    * `AcApDocManager.onAfterOpenDocument`, which zooms the startup
    * layout right after parsing). Subsequent first-visit async zoom
@@ -1353,10 +1374,27 @@ export class AcTrView2d extends AcEdBaseView {
     return undefined
   }
 
+  private applyInitialZoom(btrId: AcDbObjectId, layout: AcDbLayout) {
+    if (this.isModelSpaceBtrId(btrId)) {
+      this.applyInitialModelZoom(btrId)
+      return
+    }
+
+    this.applyInitialPaperLayoutZoom(btrId, layout)
+  }
+
+  private isModelSpaceBtrId(btrId: AcDbObjectId) {
+    return btrId === this.modelSpaceBtrId
+  }
+
+  private applyInitialModelZoom(btrId: AcDbObjectId) {
+    this.zoomToFitDrawing(0, btrId)
+  }
+
   /**
-   * Applies the initial zoom-to-fit for a layout the user just switched
-   * into for the first time. Picks the best available "what should the
-   * camera frame?" signal in this order:
+   * Applies the initial zoom-to-fit for a paper layout the user just switched
+   * into for the first time. Picks the best available "what should the camera
+   * frame?" signal in this order:
    *
    * 1. **`AcDbLayout.limits`** (LIMMIN/LIMMAX) — only when it actually
    *    contains the layout's viewports. Many real DWGs ship with garbage
@@ -1389,7 +1427,10 @@ export class AcTrView2d extends AcEdBaseView {
    * `_numOfEntitiesToProcess` and only fires the heuristic once the
    * conversion is done.
    */
-  private applyInitialZoom(btrId: AcDbObjectId, layout: AcDbLayout) {
+  private applyInitialPaperLayoutZoom(
+    btrId: AcDbObjectId,
+    layout: AcDbLayout
+  ) {
     const waiter = new AcEdConditionWaiter(
       () => this._numOfEntitiesToProcess <= 0,
       () => {
