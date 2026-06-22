@@ -1,9 +1,16 @@
 import peerDepsExternal from 'rollup-plugin-peer-deps-external'
-import { defineConfig, PluginOption } from 'vite'
+import path from 'node:path'
+import { defineConfig, normalizePath, PluginOption } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import { createLibEntryFileName } from '../vite-config/pluginRollupOutput'
 
 const packageId = 'cad-simple-viewer'
+const mtextRendererDist = normalizePath(
+  path.resolve(
+  __dirname,
+  '../../../mtext-renderer/packages/mtext-renderer/dist'
+  )
+)
 
 export default defineConfig({
   build: {
@@ -16,6 +23,7 @@ export default defineConfig({
     },
     minify: true,
     rollupOptions: {
+      external: ['@mlightcad/mtext-renderer'],
       output: {
         chunkFileNames: `${packageId}-[name]-[hash].js`
       }
@@ -34,7 +42,7 @@ export default defineConfig({
           dest: ''
         },
         {
-          src: './node_modules/@mlightcad/mtext-renderer/dist/mtext-renderer-worker.js',
+          src: `${mtextRendererDist}/mtext-renderer-worker.js`,
           dest: ''
         }
       ]
